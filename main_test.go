@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-var routes = []Route{
+var mockedRoutes = []Route{
 	{
 		Path: "/test-1",
 	},
@@ -25,36 +25,36 @@ var routesWithMethod = []struct {
 }{
 	{
 		method: "GET",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "POST",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "PUT",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "PATCH",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "DELETE",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "HEAD",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "OPTIONS",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 }
 
 func TestStoreRoutes(t *testing.T) {
-	fakeHandler := func(ctx ContextParams) {}
+	fakeHandler := func(ctx *Context) {}
 	for _, test := range routesWithMethod {
 		t.Run(fmt.Sprintf("add routes with method %s", test.method), func(t *testing.T) {
 			router := NewRouter()
@@ -107,7 +107,7 @@ func TestServeHTTP(t *testing.T) {
 		router := NewRouter()
 		requestBody := []byte("Request body")
 		responseBody := "Response body"
-		spyHandler := func(ctx ContextParams) {
+		spyHandler := func(ctx *Context) {
 			t.Helper()
 			bodyBytes, _ := io.ReadAll(ctx.Request().Body)
 			if !reflect.DeepEqual(bodyBytes, requestBody) {
@@ -131,7 +131,7 @@ func TestServeHTTP(t *testing.T) {
 		router := NewRouter()
 		responseBody := "Response body"
 		expectedParams := map[string]string{"name": "Joe", "age": "48"}
-		spyHandler := func(ctx ContextParams) {
+		spyHandler := func(ctx *Context) {
 			t.Helper()
 
 			for name, value := range expectedParams {
@@ -156,7 +156,7 @@ func TestServeHTTP(t *testing.T) {
 
 	t.Run("Wrong route name in request", func(t *testing.T) {
 		router := NewRouter()
-		spyHandler := func(ctx ContextParams) {}
+		spyHandler := func(ctx *Context) {}
 
 		router.Get("/test-route", spyHandler)
 		newServer := httptest.NewServer(router)
@@ -171,7 +171,7 @@ func TestServeHTTP(t *testing.T) {
 
 	t.Run("Wrong route method", func(t *testing.T) {
 		router := NewRouter()
-		spyHandler := func(ctx ContextParams) {}
+		spyHandler := func(ctx *Context) {}
 
 		router.Post("/test-route", spyHandler)
 		newServer := httptest.NewServer(router)
@@ -186,7 +186,7 @@ func TestServeHTTP(t *testing.T) {
 
 	t.Run("Wrong route method with dynamic params", func(t *testing.T) {
 		router := NewRouter()
-		spyHandler := func(ctx ContextParams) {}
+		spyHandler := func(ctx *Context) {}
 
 		router.Post("/test-route/:id", spyHandler)
 		newServer := httptest.NewServer(router)
@@ -202,10 +202,10 @@ func TestServeHTTP(t *testing.T) {
 	t.Run("Success response", func(t *testing.T) {
 		router := NewRouter()
 		responseBody := "Response body"
-		spyHandler := func(ctx ContextParams) {
+		spyHandler := func(ctx *Context) {
 			t.Helper()
 
-			ctx.successJSONResponse(responseBody)
+			ctx.SuccessJSONResponse(responseBody)
 		}
 
 		router.Get("/test-route", spyHandler)

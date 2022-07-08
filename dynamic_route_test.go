@@ -12,7 +12,7 @@ func TestDynamicRoutes(t *testing.T) {
 		router := NewRouter()
 
 		expectedParams := map[string]string{"id": "10", "name": "melony"}
-		spyHandler := func(ctx ContextParams) {
+		spyHandler := func(ctx *Context) {
 			t.Helper()
 
 			for name, value := range expectedParams {
@@ -41,7 +41,7 @@ func TestDynamicRoutes(t *testing.T) {
 	t.Run("wrong length of called route", func(t *testing.T) {
 		router := NewRouter()
 
-		spyHandler := func(ctx ContextParams) {
+		spyHandler := func(ctx *Context) {
 			t.Helper()
 
 			io.WriteString(ctx.ResponseWriter(), "Should not run this function")
