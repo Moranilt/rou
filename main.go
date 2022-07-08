@@ -44,7 +44,7 @@ func (r routerParams) Get(name string) string {
 
 type Route struct {
 	Path    string
-	Handler func(ContextParams)
+	Handler func(*Context)
 }
 
 type existingRoute struct {
@@ -58,7 +58,7 @@ type routes struct {
 }
 
 // Stores route to if it is not exists
-func (r *routes) storeRoute(method string, route string, handler func(ContextParams)) {
+func (r *routes) storeRoute(method string, route string, handler func(*Context)) {
 	newRoute := existingRoute{Method: method, Path: route}
 	if !r.existingRoutesWithMethod[newRoute] {
 		r.existingRoutesWithMethod[newRoute] = true
@@ -83,84 +83,64 @@ func (r routes) GetRoutes(method string) []Route {
 
 // Initial struct to create HTTP server provide this structure to http.ListenAndServe function
 // It has a list of routes  which is stored to serve
-type simpleRouter struct {
-	Routes *routes
-}
-
-type SimpleRouter interface {
-	// Get a list of routes with handlers by method
-	GetRoutes(method string) []Route
-	// Add route by method GET
-	Get(route string, handler func(ContextParams))
-	// Add route by method POST
-	Post(route string, handler func(ContextParams))
-	// Add route by method PUT
-	Put(route string, handler func(ContextParams))
-	// Add route by method PATCH
-	Patch(route string, handler func(ContextParams))
-	// Add route by method DELETE
-	Delete(route string, handler func(ContextParams))
-	// Add route by method OPTIONS
-	Options(route string, handler func(ContextParams))
-	// Add route by method HEAD
-	Head(route string, handler func(ContextParams))
-	// Implements an http.Handler interface to use it like server handler in http.ListenAndServe
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
+type SimpleRouter struct {
+	Routes      *routes
+	ContentType string
 }
 
 // Create as new SimpleRouter instance
-func NewRouter() SimpleRouter {
+func NewRouter() *SimpleRouter {
 	routes := routes{
 		existingRoutesWithMethod: make(map[existingRoute]bool),
 		routes:                   make(map[string][]Route),
 	}
-	return &simpleRouter{Routes: &routes}
+	return &SimpleRouter{Routes: &routes}
 }
 
-func (sr simpleRouter) GetRoutes(method string) []Route {
+func (sr SimpleRouter) GetRoutes(method string) []Route {
 	return sr.Routes.GetRoutes(method)
 }
 
-func (sr *simpleRouter) storeRoute(method string, route string, handler func(ContextParams)) {
+func (sr *SimpleRouter) storeRoute(method string, route string, handler func(*Context)) {
 	sr.Routes.storeRoute(method, route, handler)
 }
 
 // Add route by method GET
-func (sr simpleRouter) Get(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Get(route string, handler func(*Context)) {
 	sr.storeRoute(MethodGet, route, handler)
 }
 
 // Add route by method POST
-func (sr simpleRouter) Post(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Post(route string, handler func(*Context)) {
 	sr.storeRoute(MethodPost, route, handler)
 }
 
 // Add route by method PUT
-func (sr simpleRouter) Put(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Put(route string, handler func(*Context)) {
 	sr.storeRoute(MethodPut, route, handler)
 }
 
 // Add route by method PATCH
-func (sr simpleRouter) Patch(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Patch(route string, handler func(*Context)) {
 	sr.storeRoute(MethodPatch, route, handler)
 }
 
 // Add route by method DELETE
-func (sr simpleRouter) Delete(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Delete(route string, handler func(*Context)) {
 	sr.storeRoute(MethodDelete, route, handler)
 }
 
 // Add route by method OPTIONS
-func (sr simpleRouter) Options(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Options(route string, handler func(*Context)) {
 	sr.storeRoute(MethodOptions, route, handler)
 }
 
 // Add route by method HEAD
-func (sr simpleRouter) Head(route string, handler func(ContextParams)) {
+func (sr SimpleRouter) Head(route string, handler func(*Context)) {
 	sr.storeRoute(MethodHead, route, handler)
 }
 
-func (sr simpleRouter) createContext(w http.ResponseWriter, r *http.Request) *Context {
+func (sr SimpleRouter) createContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
 		responseWriter: w,
 		request:        r,
@@ -199,7 +179,8 @@ func isEqualPaths(route string, requestPath string) (*map[string]string, bool) {
 	return &params, true
 }
 
-func (sr *simpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// Implements an http.Handler interface to use it like server handler in http.ListenAndServe
+func (sr *SimpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := sr.createContext(w, r)
 
 	routesByMethod := sr.GetRoutes(r.Method)
@@ -228,4 +209,9 @@ ROUTES_BY_METHOD:
 		return
 	}
 	ctx.ErrorJSONResponse(http.StatusNotFound, MessagePageNotFound)
+}
+
+// Runs server with http.ListenAndServe
+func (sr *SimpleRouter) RunServer(addr string) error {
+	return http.ListenAndServe(addr, sr)
 }
