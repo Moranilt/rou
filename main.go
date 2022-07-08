@@ -88,7 +88,7 @@ type SimpleRouter struct {
 	ContentType string
 }
 
-// Create as new SimpleRouter instance
+// Create a new SimpleRouter instance
 func NewRouter() *SimpleRouter {
 	routes := routes{
 		existingRoutesWithMethod: make(map[existingRoute]bool),
