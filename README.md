@@ -1,7 +1,16 @@
 # Simple HTTP router
  A simple HTTP router built on top of the Golang http library
+ 
+ ## Install
+ 
+ `rou` is a standard Go module which can be installed with:
 
-# Usage
+```sh
+go get github.com/Moranilt/rou
+```
+ 
+
+## Usage
 
 ```go
 package main
@@ -28,7 +37,7 @@ func POST_UserHandler(ctx *rou.Context) {
 }
 
 func main() {
-  router := NewRouter()
+  router := rou.NewRouter()
 
   router.Get("/users/:userId", GET_UserHandler)
   router.Get("/users/:userId/posts/:postId", GET_UsersPostHandler)
