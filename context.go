@@ -20,19 +20,6 @@ type Storage interface {
 	Get(name string) string
 }
 
-type ContextParams interface {
-	ResponseWriter() http.ResponseWriter
-	Request() *http.Request
-	Params() url.Values
-	// Returns RouterParams structure with params of route as key value
-	//
-	// If you have route "/user/:id/posts/:postId" and request URL path "/user/1/posts/45" RouterParams will have map with keys
-	// took from route and values which it will take from request URL path `["id": "1", "postId": "45"]`
-	RouterParams() Storage
-	SuccessJSONResponse(body any)
-	ErrorJSONResponse(status int, message string)
-}
-
 type ErrorObject struct {
 	Message string `json:"message"`
 	Code    int    `json:"code"`
@@ -56,6 +43,11 @@ func (c Context) Request() *http.Request {
 // Returns query params of request
 func (c Context) Params() url.Values {
 	return c.request.URL.Query()
+}
+
+// Set response content type
+func (ctx *Context) SetContentType(contentType string) {
+	ctx.responseWriter.Header().Add("Content-Type", contentType)
 }
 
 // Returns RouterParams structure with params of route as key value
