@@ -1,4 +1,4 @@
-package main
+package rou
 
 import (
 	"bytes"
@@ -136,7 +136,7 @@ func TestServeHTTP(t *testing.T) {
 
 			for name, value := range expectedParams {
 				if ctx.Params().Get(name) != value {
-					t.Errorf("Prams %s is not value. Got - %s, want - %s", name, ctx.Params().Get(name), value)
+					t.Errorf("Pram %s is not equal to expected value. Got - %s, want - %s", name, ctx.Params().Get(name), value)
 					return
 				}
 			}
@@ -150,7 +150,7 @@ func TestServeHTTP(t *testing.T) {
 
 		resBytes, _ := io.ReadAll(res.Body)
 		if !reflect.DeepEqual(resBytes, []byte(responseBody)) {
-			t.Errorf("Response is not the same. Got - %s, want %s", responseBody, resBytes)
+			t.Errorf("Response is not the same. Got - %s, want %s", resBytes, responseBody)
 		}
 	})
 
@@ -165,7 +165,7 @@ func TestServeHTTP(t *testing.T) {
 		expectedResponse := `{"error":{"message":"Page not found","code":404},"body":null}`
 		resBytes, _ := io.ReadAll(res.Body)
 		if !reflect.DeepEqual(resBytes, []byte(expectedResponse)) {
-			t.Errorf("Response is not the same. Got - %s, want %s", expectedResponse, resBytes)
+			t.Errorf("Response is not the same. Got - %s, want %s", resBytes, expectedResponse)
 		}
 	})
 
@@ -178,6 +178,41 @@ func TestServeHTTP(t *testing.T) {
 		res, _ := http.Get(newServer.URL + "/test-route")
 
 		expectedResponse := `{"error":{"message":"Method not allowed","code":405},"body":null}`
+		resBytes, _ := io.ReadAll(res.Body)
+		if !reflect.DeepEqual(resBytes, []byte(expectedResponse)) {
+			t.Errorf("Response is not the same. Got - %s, want %s", resBytes, expectedResponse)
+		}
+	})
+
+	t.Run("Wrong route method with dynamic params", func(t *testing.T) {
+		router := NewRouter()
+		spyHandler := func(ctx ContextParams) {}
+
+		router.Post("/test-route/:id", spyHandler)
+		newServer := httptest.NewServer(router)
+		res, _ := http.Get(newServer.URL + "/test-route/10")
+
+		expectedResponse := `{"error":{"message":"Method not allowed","code":405},"body":null}`
+		resBytes, _ := io.ReadAll(res.Body)
+		if !reflect.DeepEqual(resBytes, []byte(expectedResponse)) {
+			t.Errorf("Response is not the same. Got - %s, want %s", resBytes, expectedResponse)
+		}
+	})
+
+	t.Run("Success response", func(t *testing.T) {
+		router := NewRouter()
+		responseBody := "Response body"
+		spyHandler := func(ctx ContextParams) {
+			t.Helper()
+
+			ctx.successJSONResponse(responseBody)
+		}
+
+		router.Get("/test-route", spyHandler)
+		newServer := httptest.NewServer(router)
+		res, _ := http.Get(newServer.URL + "/test-route")
+
+		expectedResponse := `{"error":null,"body":"Response body"}`
 		resBytes, _ := io.ReadAll(res.Body)
 		if !reflect.DeepEqual(resBytes, []byte(expectedResponse)) {
 			t.Errorf("Response is not the same. Got - %s, want %s", expectedResponse, resBytes)

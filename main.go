@@ -1,10 +1,8 @@
-package main
+package rou
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
-	"net/url"
+	"strings"
 )
 
 const (
@@ -22,6 +20,34 @@ const (
 	MessageMethodNotAllowed = "Method not allowed"
 	MessagePageNotFound     = "Page not found"
 )
+
+type routerParams struct {
+	value map[string]string
+}
+
+func (r *routerParams) Delete(name string) {
+	delete(r.value, name)
+}
+
+func (r routerParams) Has(name string) bool {
+	_, has := r.value[name]
+	return has
+}
+
+func (r *routerParams) Set(name, value string) {
+	r.value[name] = value
+}
+
+func (r routerParams) Get(name string) string {
+	return r.value[name]
+}
+
+type Storage interface {
+	Delete(name string)
+	Has(name string) bool
+	Set(name, value string)
+	Get(name string) string
+}
 
 type Route struct {
 	Path    string
@@ -50,8 +76,14 @@ func (r *Routes) storeRoute(method string, route string, handler func(ContextPar
 }
 
 // Check for route exists in Routes with given method and path
-func (r Routes) Exists(route string) bool {
-	return r.existingRoutesName[route]
+func (r Routes) Exists(requestPath string) bool {
+	for route := range r.existingRoutesName {
+		_, equal := isEqualPaths(route, requestPath)
+		if equal {
+			return true
+		}
+	}
+	return false
 }
 
 func (r Routes) GetRoutes(method string) []Route {
@@ -121,7 +153,39 @@ func (sr SimpleRouter) createContext(w http.ResponseWriter, r *http.Request) *Co
 	return &Context{
 		responseWriter: w,
 		request:        r,
+		routeParams:    &routerParams{value: make(map[string]string)},
 	}
+}
+
+func prepareURLChunks(url string) []string {
+	return strings.Split(strings.Trim(url, "/"), "/")
+}
+
+func isEqualPaths(route string, requestPath string) (*map[string]string, bool) {
+	params := make(map[string]string)
+
+	if route == requestPath {
+		return &params, true
+	}
+
+	clearRoutePath := prepareURLChunks(route)
+	clearRequestPath := prepareURLChunks(requestPath)
+
+	if len(clearRoutePath) != len(clearRequestPath) {
+		return nil, false
+	}
+
+	for i := 0; i < len(clearRoutePath); i++ {
+		routeChunk := clearRoutePath[i]
+		if clearRoutePath[i][0] == ':' {
+			params[routeChunk[1:]] = clearRequestPath[i]
+		} else {
+			if clearRequestPath[i] != routeChunk {
+				return nil, false
+			}
+		}
+	}
+	return &params, true
 }
 
 func (sr *SimpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -129,12 +193,23 @@ func (sr *SimpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	routesByMethod := sr.GetRoutes(r.Method)
 
+ROUTES_BY_METHOD:
 	for _, route := range routesByMethod {
-
 		if r.URL.Path == route.Path {
 			route.Handler(ctx)
 			return
 		}
+
+		params, equal := isEqualPaths(route.Path, r.URL.Path)
+		if !equal {
+			continue ROUTES_BY_METHOD
+		}
+
+		for name, value := range *params {
+			ctx.RouterParams().Set(name, value)
+		}
+		route.Handler(ctx)
+		return
 	}
 
 	if sr.Routes.Exists(r.URL.Path) {
@@ -142,56 +217,4 @@ func (sr *SimpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx.errorJSONResponse(http.StatusNotFound, MessagePageNotFound)
-}
-
-type Context struct {
-	responseWriter http.ResponseWriter
-	request        *http.Request
-}
-
-type ContextParams interface {
-	ResponseWriter() http.ResponseWriter
-	Request() *http.Request
-	Params() url.Values
-}
-
-type ErrorObject struct {
-	Message string `json:"message"`
-	Code    int    `json:"code"`
-}
-
-type ResponseObject[T any] struct {
-	Error *ErrorObject `json:"error"`
-	Body  T            `json:"body"`
-}
-
-// Returns basic HTTP response writer
-func (c Context) ResponseWriter() http.ResponseWriter {
-	return c.responseWriter
-}
-
-// Returns basic HTTP request object
-func (c Context) Request() *http.Request {
-	return c.request
-}
-
-// Returns query params of request
-func (c Context) Params() url.Values {
-	return c.request.URL.Query()
-}
-
-func (c Context) errorJSONResponse(status int, message string) {
-	c.ResponseWriter().Header().Add("Content-Type", "application/json")
-	c.ResponseWriter().WriteHeader(status)
-	responseMsg := ResponseObject[any]{Error: &ErrorObject{Message: message, Code: status}}
-	jsonContent, _ := json.Marshal(responseMsg)
-	io.WriteString(c.ResponseWriter(), string(jsonContent))
-}
-
-func (c Context) successJSONResponse(body any) {
-	c.ResponseWriter().Header().Add("Content-Type", "application/json")
-	c.ResponseWriter().WriteHeader(http.StatusOK)
-	responseMsg := ResponseObject[any]{Body: body}
-	jsonContent, _ := json.Marshal(responseMsg)
-	io.WriteString(c.ResponseWriter(), string(jsonContent))
 }
