@@ -13,6 +13,13 @@ type Context struct {
 	routeParams    Storage
 }
 
+type Storage interface {
+	Delete(name string)
+	Has(name string) bool
+	Set(name, value string)
+	Get(name string) string
+}
+
 type ContextParams interface {
 	ResponseWriter() http.ResponseWriter
 	Request() *http.Request
@@ -22,7 +29,8 @@ type ContextParams interface {
 	// If you have route "/user/:id/posts/:postId" and request URL path "/user/1/posts/45" RouterParams will have map with keys
 	// took from route and values which it will take from request URL path `["id": "1", "postId": "45"]`
 	RouterParams() Storage
-	successJSONResponse(body any)
+	SuccessJSONResponse(body any)
+	ErrorJSONResponse(status int, message string)
 }
 
 type ErrorObject struct {
@@ -58,7 +66,7 @@ func (c Context) RouterParams() Storage {
 	return c.routeParams
 }
 
-func (c Context) errorJSONResponse(status int, message string) {
+func (c Context) ErrorJSONResponse(status int, message string) {
 	c.ResponseWriter().Header().Add("Content-Type", "application/json")
 	c.ResponseWriter().WriteHeader(status)
 	responseMsg := ResponseObject[any]{Error: &ErrorObject{Message: message, Code: status}}
@@ -66,7 +74,7 @@ func (c Context) errorJSONResponse(status int, message string) {
 	io.WriteString(c.ResponseWriter(), string(jsonContent))
 }
 
-func (c Context) successJSONResponse(body any) {
+func (c Context) SuccessJSONResponse(body any) {
 	c.ResponseWriter().Header().Add("Content-Type", "application/json")
 	c.ResponseWriter().WriteHeader(http.StatusOK)
 	responseMsg := ResponseObject[any]{Body: body}

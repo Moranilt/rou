@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-var routes = []Route{
+var mockedRoutes = []Route{
 	{
 		Path: "/test-1",
 	},
@@ -25,31 +25,31 @@ var routesWithMethod = []struct {
 }{
 	{
 		method: "GET",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "POST",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "PUT",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "PATCH",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "DELETE",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "HEAD",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 	{
 		method: "OPTIONS",
-		routes: routes,
+		routes: mockedRoutes,
 	},
 }
 
@@ -205,7 +205,7 @@ func TestServeHTTP(t *testing.T) {
 		spyHandler := func(ctx ContextParams) {
 			t.Helper()
 
-			ctx.successJSONResponse(responseBody)
+			ctx.SuccessJSONResponse(responseBody)
 		}
 
 		router.Get("/test-route", spyHandler)
