@@ -19,6 +19,11 @@ import (
   "github.com/Moranilt/rou"
 )
 
+const (
+  authError = "Authorization header should be provided"
+  requestDataError = "X-Request-Data header should be provided"
+)
+
 func GET_UserHandler(ctx *rou.Context) {
   userId := ctx.RouterParams().Get("userId") // Extract params from router
   // etc
@@ -36,10 +41,26 @@ func POST_UserHandler(ctx *rou.Context) {
   // your actions
 }
 
+func AuthMiddleware(w http.ResponseWriter, r *http.Request) bool {
+	if r.Header.Get("Authorization") == "" {
+		io.WriteString(w, authError)
+		return false
+	}
+	return true
+}
+
+func RequestDataMiddleware(w http.ResponseWriter, r *http.Request) bool {
+	if r.Header.Get("X-Request-Data") == "" {
+		io.WriteString(w, requestDataError)
+		return false
+	}
+	return true
+}
+
 func main() {
   router := rou.NewRouter()
-
-  router.Get("/users/:userId", GET_UserHandler)
+  router.Middleware(AuthMiddleware)
+  router.Get("/users/:userId", GET_UserHandler).Middleware(RequestDataMiddleware)
   router.Get("/users/:userId/posts/:postId", GET_UsersPostHandler)
   router.Post("/users/create", POST_UserHandler)
   router.Put(...)

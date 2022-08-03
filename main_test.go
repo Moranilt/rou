@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-var mockedRoutes = []Route{
+var mockedRoutes = []*Route{
 	{
 		Path: "/test-1",
 	},
@@ -21,7 +21,7 @@ var mockedRoutes = []Route{
 
 var routesWithMethod = []struct {
 	method string
-	routes []Route
+	routes []*Route
 }{
 	{
 		method: "GET",
@@ -86,7 +86,7 @@ func TestStoreRoutes(t *testing.T) {
 	}
 }
 
-func assertRoutes(t testing.TB, got, want []Route) {
+func assertRoutes(t testing.TB, got, want []*Route) {
 	t.Helper()
 
 	if len(got) != len(want) {
