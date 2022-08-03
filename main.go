@@ -21,30 +21,44 @@ const (
 	MessagePageNotFound     = "Page not found"
 )
 
-type routerParams struct {
+type MiddlewareFunction func(http.ResponseWriter, *http.Request) bool
+type RouterMethods interface {
+	Middleware(middlewares ...MiddlewareFunction)
+}
+
+type routerBuilder struct {
 	value map[string]string
 }
 
-func (r *routerParams) Delete(name string) {
+func (r *routerBuilder) Delete(name string) {
 	delete(r.value, name)
 }
 
-func (r routerParams) Has(name string) bool {
+func (r routerBuilder) Has(name string) bool {
 	_, has := r.value[name]
 	return has
 }
 
-func (r *routerParams) Set(name, value string) {
+func (r *routerBuilder) Set(name, value string) {
 	r.value[name] = value
 }
 
-func (r routerParams) Get(name string) string {
+func (r routerBuilder) Get(name string) string {
 	return r.value[name]
 }
 
 type Route struct {
-	Path    string
-	Handler func(*Context)
+	Path        string
+	Handler     func(*Context)
+	middlewares []MiddlewareFunction
+}
+
+// Store all middllewares for a specific router
+//
+// Every middleware should return TRUE if the rule succeeds
+// If the middleware returns FALSE - other middlewares will not be triggered
+func (r *Route) Middleware(middlewares ...MiddlewareFunction) {
+	r.middlewares = append(r.middlewares, middlewares...)
 }
 
 type existingRoute struct {
@@ -54,16 +68,19 @@ type existingRoute struct {
 
 type routes struct {
 	existingRoutesWithMethod map[existingRoute]bool
-	routes                   map[string][]Route
+	routes                   map[string][]*Route
 }
 
 // Stores route to if it is not exists
-func (r *routes) storeRoute(method string, route string, handler func(*Context)) {
+func (r *routes) storeRoute(method string, route string, handler func(*Context)) *Route {
 	newRoute := existingRoute{Method: method, Path: route}
 	if !r.existingRoutesWithMethod[newRoute] {
 		r.existingRoutesWithMethod[newRoute] = true
-		r.routes[method] = append(r.routes[method], Route{Path: route, Handler: handler})
+		newRoute := &Route{Path: route, Handler: handler}
+		r.routes[method] = append(r.routes[method], newRoute)
+		return newRoute
 	}
+	return nil
 }
 
 // Check for route exists in Routes with given method and path
@@ -77,7 +94,7 @@ func (r routes) Exists(requestPath string) bool {
 	return false
 }
 
-func (r routes) GetRoutes(method string) []Route {
+func (r routes) GetRoutes(method string) []*Route {
 	return r.routes[method]
 }
 
@@ -86,48 +103,53 @@ func (r routes) GetRoutes(method string) []Route {
 type SimpleRouter struct {
 	Routes      *routes
 	ContentType string
+	middlewares []MiddlewareFunction
 }
 
 // Create a new SimpleRouter instance
 func NewRouter() *SimpleRouter {
 	routes := routes{
 		existingRoutesWithMethod: make(map[existingRoute]bool),
-		routes:                   make(map[string][]Route),
+		routes:                   make(map[string][]*Route),
 	}
 	return &SimpleRouter{Routes: &routes}
 }
 
-func (sr SimpleRouter) GetRoutes(method string) []Route {
+func (sr *SimpleRouter) Use(middlewares ...MiddlewareFunction) {
+	sr.middlewares = append(sr.middlewares, middlewares...)
+}
+
+func (sr SimpleRouter) GetRoutes(method string) []*Route {
 	return sr.Routes.GetRoutes(method)
 }
 
-func (sr *SimpleRouter) storeRoute(method string, route string, handler func(*Context)) {
-	sr.Routes.storeRoute(method, route, handler)
+func (sr *SimpleRouter) storeRoute(method string, route string, handler func(*Context)) RouterMethods {
+	return sr.Routes.storeRoute(method, route, handler)
 }
 
 // Add route by method GET
-func (sr SimpleRouter) Get(route string, handler func(*Context)) {
-	sr.storeRoute(MethodGet, route, handler)
+func (sr SimpleRouter) Get(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodGet, route, handler)
 }
 
 // Add route by method POST
-func (sr SimpleRouter) Post(route string, handler func(*Context)) {
-	sr.storeRoute(MethodPost, route, handler)
+func (sr SimpleRouter) Post(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodPost, route, handler)
 }
 
 // Add route by method PUT
-func (sr SimpleRouter) Put(route string, handler func(*Context)) {
-	sr.storeRoute(MethodPut, route, handler)
+func (sr SimpleRouter) Put(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodPut, route, handler)
 }
 
 // Add route by method PATCH
-func (sr SimpleRouter) Patch(route string, handler func(*Context)) {
-	sr.storeRoute(MethodPatch, route, handler)
+func (sr SimpleRouter) Patch(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodPatch, route, handler)
 }
 
 // Add route by method DELETE
-func (sr SimpleRouter) Delete(route string, handler func(*Context)) {
-	sr.storeRoute(MethodDelete, route, handler)
+func (sr SimpleRouter) Delete(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodDelete, route, handler)
 }
 
 // Add route by method OPTIONS
@@ -136,15 +158,15 @@ func (sr SimpleRouter) Options(route string, handler func(*Context)) {
 }
 
 // Add route by method HEAD
-func (sr SimpleRouter) Head(route string, handler func(*Context)) {
-	sr.storeRoute(MethodHead, route, handler)
+func (sr SimpleRouter) Head(route string, handler func(*Context)) RouterMethods {
+	return sr.storeRoute(MethodHead, route, handler)
 }
 
 func (sr SimpleRouter) createContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
 		responseWriter: w,
 		request:        r,
-		routeParams:    &routerParams{value: make(map[string]string)},
+		routeParams:    &routerBuilder{value: make(map[string]string)},
 	}
 }
 
@@ -179,15 +201,32 @@ func isEqualPaths(route string, requestPath string) (*map[string]string, bool) {
 	return &params, true
 }
 
+func runMiddleWares(route *Route, w http.ResponseWriter, r *http.Request) bool {
+	for _, middleware := range route.middlewares {
+		if !middleware(w, r) {
+			return false
+		}
+	}
+	return true
+}
+
 // Implements an http.Handler interface to use it like server handler in http.ListenAndServe
 func (sr *SimpleRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := sr.createContext(w, r)
+	for _, middleware := range sr.middlewares {
+		if !middleware(w, r) {
+			return
+		}
+	}
 
+	ctx := sr.createContext(w, r)
 	routesByMethod := sr.GetRoutes(r.Method)
 
 ROUTES_BY_METHOD:
 	for _, route := range routesByMethod {
 		if r.URL.Path == route.Path {
+			if !runMiddleWares(route, w, r) {
+				return
+			}
 			route.Handler(ctx)
 			return
 		}
@@ -196,7 +235,9 @@ ROUTES_BY_METHOD:
 		if !equal {
 			continue ROUTES_BY_METHOD
 		}
-
+		if !runMiddleWares(route, w, r) {
+			return
+		}
 		for name, value := range *params {
 			ctx.RouterParams().Set(name, value)
 		}

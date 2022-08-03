@@ -4,7 +4,7 @@ import "testing"
 
 func TestRouterParams(t *testing.T) {
 	t.Run("Set action", func(t *testing.T) {
-		routerParams := &routerParams{value: make(map[string]string)}
+		routerParams := &routerBuilder{value: make(map[string]string)}
 
 		want := "Melony"
 		routerParams.Set("user", "Melony")
@@ -15,7 +15,7 @@ func TestRouterParams(t *testing.T) {
 	})
 
 	t.Run("Get action", func(t *testing.T) {
-		routerParams := &routerParams{value: make(map[string]string)}
+		routerParams := &routerBuilder{value: make(map[string]string)}
 		want := "Melony"
 		routerParams.Set("user", want)
 		got := routerParams.Get("user")
@@ -25,7 +25,7 @@ func TestRouterParams(t *testing.T) {
 	})
 
 	t.Run("Has action", func(t *testing.T) {
-		routerParams := &routerParams{value: make(map[string]string)}
+		routerParams := &routerBuilder{value: make(map[string]string)}
 		want := "Melony"
 		routerParams.Set("user", want)
 
@@ -39,7 +39,7 @@ func TestRouterParams(t *testing.T) {
 	})
 
 	t.Run("Delete action", func(t *testing.T) {
-		routerParams := &routerParams{value: make(map[string]string)}
+		routerParams := &routerBuilder{value: make(map[string]string)}
 		want := "Melony"
 		routerParams.Set("user", want)
 		routerParams.Set("age", "20")
